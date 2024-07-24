@@ -6,7 +6,7 @@ import calendar
 app = FastAPI()
 
 # Cargar el DataFrame limpio
-df = pd.read_csv('C:/Users/54370/Documents/GitHub/movie_rs/movies_top_10_percent.csv', parse_dates=['release_date'])
+df = pd.read_csv('movies_top_10_percent.csv', parse_dates=['release_date'])
 
 # Función auxiliar para convertir mes y día en español a números
 def mes_a_numero(mes: str) -> int:
