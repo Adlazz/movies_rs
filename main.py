@@ -2,6 +2,8 @@ from fastapi import FastAPI
 import pandas as pd
 from typing import Dict
 import calendar
+from fastapi.responses import HTMLResponse
+
 
 app = FastAPI()
 
@@ -24,9 +26,10 @@ def dia_a_numero(dia: str) -> int:
     }
     return dias.get(dia.lower(), -1)
 
-@app.get("/")
-def read_root():
-    return {"mensaje": "Bienvenido a la API de películas"}
+@app.get("/", response_class=HTMLResponse)
+async def read_root():
+    with open("index.html", "r") as f:
+        return f.read()
 
 # Endpoint para cantidad de filmaciones por mes
 @app.get("/cantidad_filmaciones_mes/{mes}")
