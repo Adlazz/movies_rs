@@ -1,9 +1,11 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
+from datetime import datetime
 import pandas as pd
-from typing import Dict
+from typing import Dict, List
 import calendar
 from fastapi.responses import HTMLResponse
-
+import ast
 
 app = FastAPI()
 
@@ -52,71 +54,132 @@ def cantidad_filmaciones_dia(dia: str) -> Dict[str, str]:
     return {"mensaje": f"{cantidad} cantidad de películas fueron estrenadas en los días {dia}"}
 
 # Endpoint para obtener score de una película
-@app.get("/score_titulo/{titulo}")
-def score_titulo(titulo: str) -> Dict[str, str]:
-    pelicula = df[df['title'].str.contains(titulo, case=False, na=False)].iloc[0]
-    return {
-        "titulo": pelicula['title'],
-        "año": pelicula['release_year'],
-        "score": pelicula['popularity']
-    }
-
-# Endpoint para obtener votos de una película
-@app.get("/votos_titulo/{titulo}")
-def votos_titulo(titulo: str) -> Dict[str, str]:
-    pelicula = df[df['title'].str.contains(titulo, case=False, na=False)].iloc[0]
-    if pelicula['vote_count'] < 2000:
-        return {"mensaje": "La película no cumple con la condición de tener al menos 2000 valoraciones"}
+@app.get("/score_titulo/{titulo_de_la_filmacion}")
+async def score_titulo(titulo_de_la_filmacion: str):
+    # Buscar la película por título (ignorando mayúsculas y minúsculas)
+    pelicula = df[df['title'].str.lower() == titulo_de_la_filmacion.lower()]
     
-    return {
-        "titulo": pelicula['title'],
-        "cantidad_votos": pelicula['vote_count'],
-        "promedio_votos": pelicula['vote_average']
-    }
+    if pelicula.empty:
+        raise HTTPException(status_code=404, detail="Película no encontrada")
+    
+    # Obtener los datos necesarios
+    titulo = pelicula['title'].iloc[0]
+    anio = pelicula['release_year'].iloc[0]
+    score = pelicula['popularity'].iloc[0]
+    
+    # Formar la respuesta
+    respuesta = f"La película {titulo} fue estrenada en el año {anio} con un score/popularidad de {score:.2f}"
+    
+    return {"mensaje": respuesta}
+# Endpoint para obtener votos de una película
+@app.get("/votos_titulo/{titulo_de_la_filmacion}")
+async def votos_titulo(titulo_de_la_filmacion: str):
+    # Buscar la película por título (ignorando mayúsculas y minúsculas)
+    pelicula = df[df['title'].str.lower() == titulo_de_la_filmacion.lower()]
+    
+    if pelicula.empty:
+        raise HTTPException(status_code=404, detail="Película no encontrada")
+    
+    # Obtener los datos necesarios
+    titulo = pelicula['title'].iloc[0]
+    votos = pelicula['vote_count'].iloc[0]
+    promedio_votos = pelicula['vote_average'].iloc[0]
+    anio = pelicula['release_year'].iloc[0]
+    
+    # Verificar si la película tiene al menos 2000 votos
+    if votos < 2000:
+        return {
+            "mensaje": f"La película {titulo} no cumple con la condición de tener al menos 2000 votos. "
+                       f"Actualmente tiene {votos} votos."
+        }
+    
+    # Formar la respuesta
+    respuesta = (f"La película {titulo} fue estrenada en el año {anio}. "
+                 f"La misma cuenta con un total de {votos:.0f} valoraciones, "
+                 f"con un promedio de {promedio_votos:.2f}")
+    
+    return {"mensaje": respuesta}
 
 # Endpoint para obtener información de un actor
-@app.get("/get_actor/{nombre_actor}")
-def get_actor(nombre_actor: str) -> Dict[str, str]:
-    peliculas_actor = df[df['casting'].str.contains(nombre_actor, case=False, na=False)]
-    if peliculas_actor.empty:
-        return {"mensaje": f"No se encontraron películas para el actor {nombre_actor}"}
+def process_casting(casting_str):
+    try:
+        return ast.literal_eval(casting_str)
+    except:
+        return []
 
-    cantidad = peliculas_actor.shape[0]
-    retorno_total = peliculas_actor['return'].sum()
-    retorno_promedio = retorno_total / cantidad
+# Procesar la columna 'casting' una vez al inicio
+df['casting_list'] = df['casting'].apply(process_casting)
+
+@app.get("/get_actor/{nombre_actor}")
+async def get_actor(nombre_actor: str):
+    # Filtrar las películas donde el actor participa
+    peliculas_actor = df[df['casting_list'].apply(lambda x: nombre_actor.lower() in [actor.lower() for actor in x])]
     
-    return {
-        "actor": nombre_actor,
-        "cantidad_filmaciones": cantidad,
-        "retorno_total": retorno_total,
-        "retorno_promedio": retorno_promedio
-    }
+    if peliculas_actor.empty:
+        raise HTTPException(status_code=404, detail="Actor no encontrado en el dataset")
+    
+    # Calcular estadísticas
+    cantidad_peliculas = len(peliculas_actor)
+    retorno_total = peliculas_actor['return'].sum()
+    retorno_promedio = peliculas_actor['return'].mean()
+    
+    # Formar la respuesta
+    respuesta = (f"El actor {nombre_actor} ha participado de {cantidad_peliculas} cantidad de filmaciones, "
+                 f"el mismo ha conseguido un retorno de {retorno_total:.2f} con un promedio de {retorno_promedio:.2f} por filmación")
+    
+    return {"mensaje": respuesta}
 
 # Endpoint para obtener información de un director
-@app.get("/get_director/{nombre_director}")
-def get_director(nombre_director: str) -> Dict[str, str]:
-    peliculas_director = df[df['director'].str.contains(nombre_director, case=False, na=False)]
+# Función auxiliar para procesar la columna 'director'
+def process_director(director_str):
+    try:
+        return ast.literal_eval(director_str)
+    except:
+        return []
+
+# Procesar la columna 'director' una vez al inicio
+df['director_list'] = df['director'].apply(process_director)
+
+class PeliculaInfo(BaseModel):
+    titulo: str
+    fecha_lanzamiento: str
+    retorno: float
+    costo: float
+    ganancia: float
+
+class DirectorInfo(BaseModel):
+    nombre: str
+    retorno_total: float
+    peliculas: List[PeliculaInfo]
+
+@app.get("/get_director/{nombre_director}", response_model=DirectorInfo)
+async def get_director(nombre_director: str):
+    # Filtrar las películas donde el director participa
+    peliculas_director = df[df['director_list'].apply(lambda x: nombre_director.lower() in [director.lower() for director in x])]
+    
     if peliculas_director.empty:
-        return {"mensaje": f"No se encontraron películas para el director {nombre_director}"}
+        raise HTTPException(status_code=404, detail="Director no encontrado en el dataset")
     
-    director_info = {
-        "director": nombre_director,
-        "cantidad_filmaciones": peliculas_director.shape[0],
-        "retorno_total": peliculas_director['return'].sum(),
-        "retorno_promedio": peliculas_director['return'].mean(),
-        "peliculas": []
-    }
+    # Calcular el retorno total
+    retorno_total = peliculas_director['return'].sum()
     
-    for _, row in peliculas_director.iterrows():
-        director_info["peliculas"].append({
-            "titulo": row['title'],
-            "fecha_lanzamiento": row['release_date'].strftime("%Y-%m-%d"),
-            "retorno_individual": row['return'],
-            "costo": row['budget'],
-            "ganancia": row['revenue']
-        })
+    # Preparar la información de cada película
+    peliculas_info = []
+    for _, pelicula in peliculas_director.iterrows():
+        peliculas_info.append(PeliculaInfo(
+            titulo=pelicula['title'],
+            fecha_lanzamiento=pelicula['release_date'].strftime('%Y-%m-%d'),
+            retorno=pelicula['return'],
+            costo=pelicula['budget'],
+            ganancia=pelicula['revenue'] - pelicula['budget']
+        ))
     
-    return director_info
+    # Crear y devolver la respuesta
+    return DirectorInfo(
+        nombre=nombre_director,
+        retorno_total=retorno_total,
+        peliculas=peliculas_info
+    )
 
 # Ejecutar la aplicación
 if __name__ == "__main__":
