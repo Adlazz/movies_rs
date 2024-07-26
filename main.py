@@ -6,6 +6,8 @@ from typing import Dict, List
 import calendar
 from fastapi.responses import HTMLResponse
 import ast
+from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
 
 app = FastAPI()
 
@@ -180,6 +182,39 @@ async def get_director(nombre_director: str):
         retorno_total=retorno_total,
         peliculas=peliculas_info
     )
+
+# Preparar los datos para el sistema de recomendación
+def combinar_caracteristicas(row):
+    return ' '.join([str(row['genres']), str(row['director']), str(row['casting'])])
+
+df['combined_features'] = df.apply(combinar_caracteristicas, axis=1)
+
+# Crear la matriz de características
+count_vectorizer = CountVectorizer(stop_words='english')
+count_matrix = count_vectorizer.fit_transform(df['combined_features'])
+
+# Calcular la similitud del coseno
+cosine_sim = cosine_similarity(count_matrix)
+
+# Función para obtener recomendaciones
+def get_recommendations(title, cosine_sim=cosine_sim):
+    idx = df[df['title'] == title].index[0]
+    sim_scores = list(enumerate(cosine_sim[idx]))
+    sim_scores = sorted(sim_scores, key=lambda x: x[1], reverse=True)
+    sim_scores = sim_scores[1:6]  # Top 5 películas similares
+    movie_indices = [i[0] for i in sim_scores]
+    return df['title'].iloc[movie_indices].tolist()
+
+# Endpoint para recomendaciones
+@app.get("/recomendacion/{titulo}")
+async def recomendacion(titulo: str):
+    try:
+        recomendaciones = get_recommendations(titulo)
+        return {"recomendaciones": recomendaciones}
+    except IndexError:
+        raise HTTPException(status_code=404, detail="Película no encontrada")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 # Ejecutar la aplicación
 if __name__ == "__main__":
