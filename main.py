@@ -34,6 +34,11 @@ def dia_a_numero(dia: str) -> int:
 async def read_root():
     with open("index.html", "r") as f:
         return f.read()
+    
+@app.get("/interface", response_class=HTMLResponse)
+async def interface():
+    with open("interface.html", "r") as f:
+        return f.read()
 
 # Endpoint para cantidad de filmaciones por mes
 @app.get("/cantidad_filmaciones_mes/{mes}")

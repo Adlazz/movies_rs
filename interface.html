@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API de Películas - Interfaz</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        h1, h2 {
+            color: #2c3e50;
+        }
+        .form-group {
+            margin-bottom: 30px;
+            border: 1px solid #ddd;
+            padding: 15px;
+            border-radius: 5px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+        }
+        input[type="text"] {
+            width: 100%;
+            padding: 8px;
+            margin-bottom: 10px;
+        }
+        button {
+            background-color: #3498db;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        .result {
+            background-color: #f0f0f0;
+            padding: 15px;
+            border-radius: 5px;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <h1>API de Películas - Interfaz</h1>
+
+    <div class="form-group">
+        <h2>Cantidad de Filmaciones por Mes</h2>
+        <label for="mes">Mes:</label>
+        <input type="text" id="mes" placeholder="Ej: enero">
+        <button onclick="consultarAPI('/cantidad_filmaciones_mes/', 'mes', 'resultado_mes')">Consultar</button>
+        <div id="resultado_mes" class="result"></div>
+    </div>
+
+    <div class="form-group">
+        <h2>Cantidad de Filmaciones por Día</h2>
+        <label for="dia">Día:</label>
+        <input type="text" id="dia" placeholder="Ej: lunes">
+        <button onclick="consultarAPI('/cantidad_filmaciones_dia/', 'dia', 'resultado_dia')">Consultar</button>
+        <div id="resultado_dia" class="result"></div>
+    </div>
+
+    <div class="form-group">
+        <h2>Score de Título</h2>
+        <label for="titulo_score">Título de la Filmación:</label>
+        <input type="text" id="titulo_score" placeholder="Ingrese el título">
+        <button onclick="consultarAPI('/score_titulo/', 'titulo_score', 'resultado_score')">Consultar</button>
+        <div id="resultado_score" class="result"></div>
+    </div>
+
+    <div class="form-group">
+        <h2>Votos de Título</h2>
+        <label for="titulo_votos">Título de la Filmación:</label>
+        <input type="text" id="titulo_votos" placeholder="Ingrese el título">
+        <button onclick="consultarAPI('/votos_titulo/', 'titulo_votos', 'resultado_votos')">Consultar</button>
+        <div id="resultado_votos" class="result"></div>
+    </div>
+
+    <div class="form-group">
+        <h2>Información de Actor</h2>
+        <label for="actor">Nombre del Actor:</label>
+        <input type="text" id="actor" placeholder="Ingrese el nombre del actor">
+        <button onclick="consultarAPI('/get_actor/', 'actor', 'resultado_actor')">Consultar</button>
+        <div id="resultado_actor" class="result"></div>
+    </div>
+
+    <div class="form-group">
+        <h2>Información de Director</h2>
+        <label for="director">Nombre del Director:</label>
+        <input type="text" id="director" placeholder="Ingrese el nombre del director">
+        <button onclick="consultarAPI('/get_director/', 'director', 'resultado_director')">Consultar</button>
+        <div id="resultado_director" class="result"></div>
+    </div>
+
+    <div class="form-group">
+        <h2>Recomendación de Películas</h2>
+        <label for="titulo_recomendacion">Título de la Película:</label>
+        <input type="text" id="titulo_recomendacion" placeholder="Ingrese el título">
+        <button onclick="consultarAPI('/recomendacion/', 'titulo_recomendacion', 'resultado_recomendacion')">Consultar</button>
+        <div id="resultado_recomendacion" class="result"></div>
+    </div>
+
+    <script>
+        function consultarAPI(endpoint, inputId, resultId) {
+            const input = document.getElementById(inputId).value;
+            const resultDiv = document.getElementById(resultId);
+            
+            fetch(endpoint + encodeURIComponent(input))
+                .then(response => response.json())
+                .then(data => {
+                    if (data.mensaje) {
+                        resultDiv.innerHTML = `<p>${data.mensaje}</p>`;
+                    } else if (data.recomendaciones) {
+                        resultDiv.innerHTML = `<p>Recomendaciones: ${data.recomendaciones.join(', ')}</p>`;
+                    } else {
+                        resultDiv.innerHTML = `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+                    }
+                })
+                .catch(error => {
+                    resultDiv.innerHTML = `<p>Error: ${error.message}</p>`;
+                });
+        }
+    </script>
+</body>
+</html>
